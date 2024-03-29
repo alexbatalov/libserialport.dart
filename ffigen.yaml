@@ -16,3 +16,10 @@ enums:
 macros:
   include:
     - 'SP_.*'
+functions:
+  symbol-address:
+    include:
+      - sp_close
+      - sp_free_config
+      - sp_free_event_set
+      - sp_free_port

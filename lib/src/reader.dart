@@ -137,10 +137,12 @@ class _SerialPortReaderImpl implements SerialPortReader {
 
   static void _waitRead(_SerialPortReaderArgs args) {
     final port = ffi.Pointer<sp_port>.fromAddress(args.address);
-    final events = _createEvents(port, _kReadEvents);
+    final events = _SerialPortEventSet();
+    events.addPortEvents(port, _kReadEvents);
     var bytes = 0;
     while (bytes >= 0) {
-      bytes = _waitEvents(port, events, args.timeout);
+      events.wait(args.timeout);
+      bytes = dylib.sp_input_waiting(port);
       if (bytes > 0) {
         final data = Util.read(bytes, (ffi.Pointer<ffi.Uint8> ptr) {
           return dylib.sp_nonblocking_read(port, ptr.cast(), bytes);
@@ -150,29 +152,35 @@ class _SerialPortReaderImpl implements SerialPortReader {
         args.sendPort.send(SerialPort.lastError);
       }
     }
-    _releaseEvents(events);
+    events.dispose();
+  }
+}
+
+class _SerialPortEventSet implements ffi.Finalizable {
+  static final _finalizer =
+      ffi.NativeFinalizer(dylib.addresses.sp_free_event_set.cast());
+
+  _SerialPortEventSet() : _events = _init() {
+    _finalizer.attach(this, _events.cast(), detach: this);
   }
 
-  static ffi.Pointer<ffi.Pointer<sp_event_set>> _createEvents(
-    ffi.Pointer<sp_port> port,
-    int mask,
-  ) {
-    final events = ffi.calloc<ffi.Pointer<sp_event_set>>();
-    dylib.sp_new_event_set(events);
-    dylib.sp_add_port_events(events.value, port, mask);
+  final ffi.Pointer<sp_event_set> _events;
+
+  static ffi.Pointer<sp_event_set> _init() {
+    final out = ffi.calloc<ffi.Pointer<sp_event_set>>();
+    Util.call(() => dylib.sp_new_event_set(out));
+    final events = out[0];
+    ffi.calloc.free(out);
     return events;
   }
 
-  static int _waitEvents(
-    ffi.Pointer<sp_port> port,
-    ffi.Pointer<ffi.Pointer<sp_event_set>> events,
-    int timeout,
-  ) {
-    dylib.sp_wait(events.value, timeout);
-    return dylib.sp_input_waiting(port);
-  }
+  bool addPortEvents(ffi.Pointer<sp_port> port, int mask) =>
+      dylib.sp_add_port_events(_events, port, mask) == sp_return.SP_OK;
 
-  static void _releaseEvents(ffi.Pointer<ffi.Pointer<sp_event_set>> events) {
-    dylib.sp_free_event_set(events.value);
+  void wait(int timeout) => dylib.sp_wait(_events, timeout);
+
+  void dispose() {
+    dylib.sp_free_event_set(_events);
+    _finalizer.detach(this);
   }
 }

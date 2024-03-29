@@ -2084,6 +2084,22 @@ class LibSerialPort {
           'sp_get_lib_version_string');
   late final _sp_get_lib_version_string = _sp_get_lib_version_stringPtr
       .asFunction<ffi.Pointer<ffi.Char> Function()>();
+
+  late final addresses = _SymbolAddresses(this);
+}
+
+class _SymbolAddresses {
+  final LibSerialPort _library;
+  _SymbolAddresses(this._library);
+  ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<sp_port>)>>
+      get sp_free_port => _library._sp_free_portPtr;
+  ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<sp_port>)>>
+      get sp_close => _library._sp_closePtr;
+  ffi.Pointer<
+          ffi.NativeFunction<ffi.Void Function(ffi.Pointer<sp_port_config>)>>
+      get sp_free_config => _library._sp_free_configPtr;
+  ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<sp_event_set>)>>
+      get sp_free_event_set => _library._sp_free_event_setPtr;
 }
 
 /// Return values.

@@ -190,10 +190,16 @@ typedef _SerialPortConfigGet32 = int Function(
 typedef _SerialPortConfigSet = int Function(
     ffi.Pointer<sp_port_config> config, int value);
 
-class _SerialPortConfigImpl implements SerialPortConfig {
+class _SerialPortConfigImpl implements SerialPortConfig, ffi.Finalizable {
+  static final _finalizer =
+      ffi.NativeFinalizer(dylib.addresses.sp_free_config.cast());
+
   final ffi.Pointer<sp_port_config> _config;
 
-  _SerialPortConfigImpl() : _config = _init();
+  _SerialPortConfigImpl() : _config = _init() {
+    _finalizer.attach(this, _config.cast(), detach: this);
+  }
+
   _SerialPortConfigImpl.fromAddress(int address)
       : _config = ffi.Pointer<sp_port_config>.fromAddress(address);
 
@@ -209,7 +215,10 @@ class _SerialPortConfigImpl implements SerialPortConfig {
   }
 
   @override
-  void dispose() => dylib.sp_free_config(_config);
+  void dispose() {
+    dylib.sp_free_config(_config);
+    _finalizer.detach(this);
+  }
 
   @override
   int get baudRate => _get(dylib.sp_get_config_baudrate);

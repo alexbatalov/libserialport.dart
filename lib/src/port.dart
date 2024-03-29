@@ -204,11 +204,16 @@ abstract class SerialPort {
   static SerialPortError? get lastError => _SerialPortImpl.lastError;
 }
 
-class _SerialPortImpl implements SerialPort {
+class _SerialPortImpl implements SerialPort, ffi.Finalizable {
+  static final _finalizer =
+      ffi.NativeFinalizer(dylib.addresses.sp_close.cast());
+
   final ffi.Pointer<sp_port> _port;
   SerialPortConfig? _config;
 
-  _SerialPortImpl(String name) : _port = _init(name);
+  _SerialPortImpl(String name) : _port = _init(name) {
+    _finalizer.attach(this, _port.cast(), detach: this);
+  }
   _SerialPortImpl.fromAddress(int address)
       : _port = ffi.Pointer<sp_port>.fromAddress(address);
 
@@ -247,6 +252,7 @@ class _SerialPortImpl implements SerialPort {
   void dispose() {
     _config?.dispose();
     dylib.sp_free_port(_port);
+    _finalizer.detach(this);
   }
 
   @override
